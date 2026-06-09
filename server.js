@@ -1051,26 +1051,22 @@ app.get("/api/user/profile/:email", async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
     
-    // Ensure pregnancy has multiple babies fields
-    if (user.pregnancy) {
-      if (!user.pregnancy.babyCount) {
-        user.pregnancy.babyCount = 1;
-      }
-      if (!user.pregnancy.babyNames || user.pregnancy.babyNames.length === 0) {
-        user.pregnancy.babyNames = user.pregnancy.babyName ? [user.pregnancy.babyName] : [""];
-      }
-    } else {
-      // Create default pregnancy object if it doesn't exist
-      user.pregnancy = {
-        babyCount: 1,
-        babyNames: [""],
-        babyName: ""
-      };
-    }
+    // Ensure pregnancy has multiple babies fields with defaults
+    const pregnancy = user.pregnancy || {};
+    
+    const responsePregnancy = {
+      dueDate: pregnancy.dueDate || null,
+      babyName: pregnancy.babyName || "",
+      babyCount: pregnancy.babyCount || 1,
+      babyNames: pregnancy.babyNames && pregnancy.babyNames.length > 0 ? pregnancy.babyNames : [pregnancy.babyName || ""],
+      firstPregnancy: pregnancy.firstPregnancy || "yes"
+    };
     
     console.log(`📖 Profile fetched for ${email}`);
-    console.log(`   babyCount: ${user.pregnancy.babyCount}`);
-    console.log(`   babyNames: ${user.pregnancy.babyNames}`);
+    console.log(`   babyCount from DB: ${pregnancy.babyCount}`);
+    console.log(`   babyNames from DB:`, pregnancy.babyNames);
+    console.log(`   Response babyCount: ${responsePregnancy.babyCount}`);
+    console.log(`   Response babyNames:`, responsePregnancy.babyNames);
     
     res.json({
       success: true,
@@ -1079,7 +1075,7 @@ app.get("/api/user/profile/:email", async (req, res) => {
         email: user.email,
         phone: user.phone,
         profileImage: user.profileImage || null,
-        pregnancy: user.pregnancy
+        pregnancy: responsePregnancy
       }
     });
     
