@@ -52,6 +52,110 @@ const addNotification = async (email, title, message, detail, type, icon) => {
   }
 };
 
+// ========== BABY SIZE HELPER FUNCTION (Matching frontend) ==========
+const getBabySizeByWeek = (week) => {
+  const babySizes = {
+    4: "Poppy seed", 5: "Sesame seed", 6: "Lentil", 7: "Blueberry",
+    8: "Raspberry", 9: "Grape", 10: "Strawberry", 11: "Fig",
+    12: "Lime", 13: "Plum", 14: "Lemon", 15: "Apple",
+    16: "Avocado", 17: "Turnip", 18: "Bell pepper", 19: "Pomegranate",
+    20: "Banana", 21: "Mango", 22: "Sweet potato", 23: "Grapefruit",
+    24: "Cantaloupe", 25: "Acorn squash", 26: "Spaghetti squash",
+    27: "Cauliflower", 28: "Eggplant", 29: "Butternut squash",
+    30: "Large cabbage", 31: "Coconut", 32: "Papaya", 33: "Pineapple",
+    34: "Cantaloupe", 35: "Honeydew melon", 36: "Romaine lettuce",
+    37: "Swiss chard", 38: "Mini watermelon", 39: "Pumpkin", 40: "Watermelon"
+  };
+  return babySizes[week] || "Growing baby";
+};
+
+// ========== BABY LENGTH HELPER (Matching frontend) ==========
+const getBabyLengthByWeek = (week) => {
+  const babyLengths = {
+    11: 4.1, 12: 5.4, 13: 6.7, 14: 8.0,
+    15: 9.3, 16: 10.6, 17: 11.9, 18: 13.2,
+    19: 14.5, 20: 15.8, 21: 17.1, 22: 18.4,
+    23: 19.7, 24: 21.0, 25: 22.3, 26: 23.6,
+    27: 24.9, 28: 26.2, 29: 27.5, 30: 28.8,
+    31: 30.1, 32: 31.4, 33: 32.7, 34: 34.0,
+    35: 35.3, 36: 36.6, 37: 37.9, 38: 39.2,
+    39: 40.5, 40: 41.8
+  };
+  const length = babyLengths[week];
+  if (length) return length.toFixed(1);
+  
+  const weeks = Object.keys(babyLengths).map(Number);
+  const closest = weeks.reduce((prev, curr) => {
+    return Math.abs(curr - week) < Math.abs(prev - week) ? curr : prev;
+  });
+  return babyLengths[closest]?.toFixed(1) || "5.4";
+};
+
+// ========== BABY WEIGHT HELPER (Matching frontend) ==========
+const getBabyWeightByWeek = (week) => {
+  const babyWeights = {
+    11: 7, 12: 14, 13: 23, 14: 43,
+    15: 70, 16: 100, 17: 140, 18: 190,
+    19: 240, 20: 300, 21: 360, 22: 430,
+    23: 500, 24: 600, 25: 700, 26: 800,
+    27: 900, 28: 1000, 29: 1100, 30: 1300,
+    31: 1500, 32: 1700, 33: 1900, 34: 2100,
+    35: 2300, 36: 2500, 37: 2700, 38: 2900,
+    39: 3100, 40: 3400
+  };
+  const weight = babyWeights[week];
+  if (weight) return weight;
+  
+  const weeks = Object.keys(babyWeights).map(Number);
+  const closest = weeks.reduce((prev, curr) => {
+    return Math.abs(curr - week) < Math.abs(prev - week) ? curr : prev;
+  });
+  return babyWeights[closest] || "14";
+};
+
+// ========== CALCULATE PREGNANCY DATA HELPER ==========
+const calculatePregnancyData = (dueDate) => {
+  if (!dueDate) {
+    return {
+      currentWeek: 14,
+      daysLeft: 182,
+      trimester: "Second Trimester",
+      babySize: "Lemon",
+      babyLength: "8.0",
+      babyWeight: "43"
+    };
+  }
+  
+  const due = new Date(dueDate);
+  const today = new Date();
+  const totalDays = 280;
+  const daysRemaining = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+  const daysPregnant = totalDays - daysRemaining;
+  let currentWeek = Math.floor(daysPregnant / 7);
+  
+  if (currentWeek < 1) currentWeek = 1;
+  if (currentWeek > 40) currentWeek = 40;
+  
+  let trimester = "Second Trimester";
+  if (currentWeek <= 12) trimester = "First Trimester";
+  else if (currentWeek <= 27) trimester = "Second Trimester";
+  else trimester = "Third Trimester";
+  
+  const daysLeft = daysRemaining > 0 ? daysRemaining : 0;
+  const babySize = getBabySizeByWeek(currentWeek);
+  const babyLength = getBabyLengthByWeek(currentWeek);
+  const babyWeight = getBabyWeightByWeek(currentWeek);
+  
+  return {
+    currentWeek,
+    daysLeft,
+    trimester,
+    babySize,
+    babyLength,
+    babyWeight
+  };
+};
+
 // ========== CHANGE PASSWORD ROUTE ==========
 app.post("/api/auth/change-password", async (req, res) => {
   try {
@@ -260,6 +364,7 @@ app.post("/api/partner/disconnect", async (req, res) => {
   }
 });
 
+// ========== PARTNER/MOTHER DATA ROUTE - USING REAL DATA ==========
 app.get("/api/partner/mother/:email", async (req, res) => {
   try {
     const { email } = req.params;
@@ -278,17 +383,27 @@ app.get("/api/partner/mother/:email", async (req, res) => {
       return res.json({ success: true, mother: null, connected: false });
     }
     
+    // Calculate REAL pregnancy data from mother's due date
+    const dueDate = mother.pregnancy?.dueDate;
+    const pregnancyData = calculatePregnancyData(dueDate);
+    
+    // Get symptom count
+    const symptomsCount = await SymptomLog.countDocuments({ userId: mother.email });
+    
     res.json({
       success: true,
       mother: {
         name: mother.fullName,
-        currentWeek: 24,
-        trimester: "2nd Trimester",
-        daysLeft: 112,
-        dueDate: mother.pregnancy?.dueDate ? new Date(mother.pregnancy.dueDate).toLocaleDateString() : "Not set",
-        babySize: "Cantaloupe",
-        symptomsCount: 0,
-        mood: "Happy"
+        currentWeek: pregnancyData.currentWeek,
+        trimester: pregnancyData.trimester,
+        daysLeft: pregnancyData.daysLeft,
+        dueDate: dueDate ? new Date(dueDate).toLocaleDateString() : "Not set",
+        babySize: pregnancyData.babySize,
+        babyLength: `${pregnancyData.babyLength} cm`,
+        babyWeight: `${pregnancyData.babyWeight} g`,
+        symptomsCount: symptomsCount,
+        mood: "Happy",
+        pregnancy: mother.pregnancy // Include full pregnancy data for multiples
       },
       connected: true
     });
@@ -848,9 +963,13 @@ app.post("/api/user/upload-profile-image", async (req, res) => {
   }
 });
 
+// ========== PROFILE UPDATE ROUTE - WITH MULTIPLE BABIES SUPPORT ==========
 app.put("/api/user/profile", async (req, res) => {
   try {
     const { email, fullName, phone, profileImage, pregnancy } = req.body;
+    
+    console.log("📝 Updating profile for:", email);
+    console.log("Pregnancy data received:", pregnancy);
     
     if (!email) {
       return res.status(400).json({ success: false, message: "Email is required" });
@@ -861,9 +980,26 @@ app.put("/api/user/profile", async (req, res) => {
     if (phone !== undefined) updateData.phone = phone;
     if (profileImage !== undefined) updateData.profileImage = profileImage;
     
+    // Handle pregnancy data with multiple babies support
+    if (pregnancy) {
+      // Filter out empty baby names
+      const filteredBabyNames = (pregnancy.babyNames || []).filter(name => name && name.trim());
+      
+      updateData["pregnancy.dueDate"] = pregnancy.dueDate;
+      updateData["pregnancy.babyName"] = filteredBabyNames[0] || pregnancy.babyName || "";
+      updateData["pregnancy.babyCount"] = pregnancy.babyCount || 1;
+      updateData["pregnancy.babyNames"] = filteredBabyNames.length > 0 ? filteredBabyNames : [""];
+      updateData["pregnancy.firstPregnancy"] = pregnancy.firstPregnancy || "yes";
+      
+      console.log("📊 Saving pregnancy data:");
+      console.log("   babyCount:", updateData["pregnancy.babyCount"]);
+      console.log("   babyNames:", updateData["pregnancy.babyNames"]);
+      console.log("   dueDate:", updateData["pregnancy.dueDate"]);
+    }
+    
     const user = await User.findOneAndUpdate(
       { email },
-      updateData,
+      { $set: updateData },
       { new: true }
     );
     
@@ -871,18 +1007,9 @@ app.put("/api/user/profile", async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
     
-    if (pregnancy && (pregnancy.babyName !== undefined || pregnancy.dueDate !== undefined)) {
-      const pregnancyUpdate = {};
-      if (pregnancy.babyName !== undefined) pregnancyUpdate["pregnancy.babyName"] = pregnancy.babyName;
-      if (pregnancy.dueDate !== undefined) pregnancyUpdate["pregnancy.dueDate"] = pregnancy.dueDate;
-      
-      await User.findOneAndUpdate(
-        { email },
-        { $set: pregnancyUpdate }
-      );
-    }
-    
     console.log(`✅ Profile updated for ${email}`);
+    console.log(`   Updated babyCount: ${user.pregnancy?.babyCount}`);
+    console.log(`   Updated babyNames: ${user.pregnancy?.babyNames}`);
     
     res.json({ 
       success: true, 
@@ -891,7 +1018,8 @@ app.put("/api/user/profile", async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         phone: user.phone,
-        profileImage: user.profileImage
+        profileImage: user.profileImage,
+        pregnancy: user.pregnancy
       }
     });
     
@@ -901,6 +1029,7 @@ app.put("/api/user/profile", async (req, res) => {
   }
 });
 
+// ========== GET PROFILE ROUTE - WITH MULTIPLE BABIES SUPPORT ==========
 app.get("/api/user/profile/:email", async (req, res) => {
   try {
     const { email } = req.params;
@@ -909,6 +1038,20 @@ app.get("/api/user/profile/:email", async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
+    
+    // Ensure pregnancy has multiple babies fields
+    if (user.pregnancy) {
+      if (!user.pregnancy.babyCount) {
+        user.pregnancy.babyCount = 1;
+      }
+      if (!user.pregnancy.babyNames || user.pregnancy.babyNames.length === 0) {
+        user.pregnancy.babyNames = user.pregnancy.babyName ? [user.pregnancy.babyName] : [""];
+      }
+    }
+    
+    console.log(`📖 Profile fetched for ${email}`);
+    console.log(`   babyCount: ${user.pregnancy?.babyCount}`);
+    console.log(`   babyNames: ${user.pregnancy?.babyNames}`);
     
     res.json({
       success: true,
