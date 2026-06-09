@@ -1053,11 +1053,18 @@ app.get("/api/user/profile/:email", async (req, res) => {
       if (!user.pregnancy.babyNames || user.pregnancy.babyNames.length === 0) {
         user.pregnancy.babyNames = user.pregnancy.babyName ? [user.pregnancy.babyName] : [""];
       }
+    } else {
+      // Create default pregnancy object if it doesn't exist
+      user.pregnancy = {
+        babyCount: 1,
+        babyNames: [""],
+        babyName: ""
+      };
     }
     
     console.log(`📖 Profile fetched for ${email}`);
-    console.log(`   babyCount: ${user.pregnancy?.babyCount}`);
-    console.log(`   babyNames: ${user.pregnancy?.babyNames}`);
+    console.log(`   babyCount: ${user.pregnancy.babyCount}`);
+    console.log(`   babyNames: ${user.pregnancy.babyNames}`);
     
     res.json({
       success: true,
@@ -1066,7 +1073,7 @@ app.get("/api/user/profile/:email", async (req, res) => {
         email: user.email,
         phone: user.phone,
         profileImage: user.profileImage || null,
-        pregnancy: user.pregnancy || null
+        pregnancy: user.pregnancy
       }
     });
     
@@ -1075,7 +1082,6 @@ app.get("/api/user/profile/:email", async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
-
 // ========== MONGODB CONNECTION ==========
 const PORT = process.env.PORT || 5000;
 
