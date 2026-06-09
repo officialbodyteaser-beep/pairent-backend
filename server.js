@@ -969,63 +969,69 @@ app.put("/api/user/profile", async (req, res) => {
     const { email, fullName, phone, profileImage, pregnancy } = req.body;
     
     console.log("📝 Updating profile for:", email);
-    console.log("Pregnancy data received:", pregnancy);
+    console.log("Pregnancy data received:", JSON.stringify(pregnancy, null, 2));
     
     if (!email) {
       return res.status(400).json({ success: false, message: "Email is required" });
     }
     
-    // First, update basic user info
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
+    // Build the update object
+    const updateFields = {};
     
-    // Update basic fields
-    if (fullName !== undefined) user.fullName = fullName;
-    if (phone !== undefined) user.phone = phone;
-    if (profileImage !== undefined) user.profileImage = profileImage;
+    if (fullName !== undefined) updateFields.fullName = fullName;
+    if (phone !== undefined) updateFields.phone = phone;
+    if (profileImage !== undefined) updateFields.profileImage = profileImage;
     
     // Handle pregnancy data with multiple babies support
     if (pregnancy) {
-      // Initialize pregnancy object if it doesn't exist
-      if (!user.pregnancy) {
-        user.pregnancy = {};
-      }
-      
       // Filter out empty baby names
       const filteredBabyNames = (pregnancy.babyNames || []).filter(name => name && name.trim());
+      const babyCountValue = pregnancy.babyCount || 1;
+      const babyNamesValue = filteredBabyNames.length > 0 ? filteredBabyNames : [""];
+      const babyNameValue = babyNamesValue[0] || "";
       
-      // Update pregnancy fields
-      if (pregnancy.dueDate !== undefined) user.pregnancy.dueDate = pregnancy.dueDate;
-      if (pregnancy.firstPregnancy !== undefined) user.pregnancy.firstPregnancy = pregnancy.firstPregnancy;
-      user.pregnancy.babyCount = pregnancy.babyCount || 1;
-      user.pregnancy.babyNames = filteredBabyNames.length > 0 ? filteredBabyNames : [""];
-      user.pregnancy.babyName = filteredBabyNames[0] || pregnancy.babyName || "";
+      updateFields["pregnancy.dueDate"] = pregnancy.dueDate;
+      updateFields["pregnancy.babyName"] = babyNameValue;
+      updateFields["pregnancy.babyCount"] = babyCountValue;
+      updateFields["pregnancy.babyNames"] = babyNamesValue;
+      updateFields["pregnancy.firstPregnancy"] = pregnancy.firstPregnancy || "yes";
       
-      console.log("📊 Saving pregnancy data:");
-      console.log("   babyCount:", user.pregnancy.babyCount);
-      console.log("   babyNames:", user.pregnancy.babyNames);
-      console.log("   dueDate:", user.pregnancy.dueDate);
+      console.log("📊 Setting pregnancy fields:");
+      console.log("   babyCount:", babyCountValue);
+      console.log("   babyNames:", babyNamesValue);
     }
     
-    // Save the user
-    await user.save();
+    // Update the user
+    const updatedUser = await User.findOneAndUpdate(
+      { email },
+      { $set: updateFields },
+      { new: true, upsert: false }
+    );
+    
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    
+    // Ensure pregnancy exists and has defaults
+    if (!updatedUser.pregnancy) {
+      updatedUser.pregnancy = {};
+    }
+    if (!updatedUser.pregnancy.babyCount) updatedUser.pregnancy.babyCount = 1;
+    if (!updatedUser.pregnancy.babyNames) updatedUser.pregnancy.babyNames = [""];
     
     console.log(`✅ Profile updated for ${email}`);
-    console.log(`   Updated babyCount: ${user.pregnancy?.babyCount}`);
-    console.log(`   Updated babyNames: ${user.pregnancy?.babyNames}`);
+    console.log(`   Final babyCount: ${updatedUser.pregnancy.babyCount}`);
+    console.log(`   Final babyNames: ${updatedUser.pregnancy.babyNames}`);
     
-    // Return the updated user
     res.json({ 
       success: true, 
       message: "Profile updated successfully",
       user: {
-        fullName: user.fullName,
-        email: user.email,
-        phone: user.phone,
-        profileImage: user.profileImage,
-        pregnancy: user.pregnancy
+        fullName: updatedUser.fullName,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        profileImage: updatedUser.profileImage,
+        pregnancy: updatedUser.pregnancy
       }
     });
     
