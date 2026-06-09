@@ -975,42 +975,48 @@ app.put("/api/user/profile", async (req, res) => {
       return res.status(400).json({ success: false, message: "Email is required" });
     }
     
-    const updateData = {};
-    if (fullName !== undefined) updateData.fullName = fullName;
-    if (phone !== undefined) updateData.phone = phone;
-    if (profileImage !== undefined) updateData.profileImage = profileImage;
-    
-    // Handle pregnancy data with multiple babies support
-    if (pregnancy) {
-      // Filter out empty baby names
-      const filteredBabyNames = (pregnancy.babyNames || []).filter(name => name && name.trim());
-      
-      updateData["pregnancy.dueDate"] = pregnancy.dueDate;
-      updateData["pregnancy.babyName"] = filteredBabyNames[0] || pregnancy.babyName || "";
-      updateData["pregnancy.babyCount"] = pregnancy.babyCount || 1;
-      updateData["pregnancy.babyNames"] = filteredBabyNames.length > 0 ? filteredBabyNames : [""];
-      updateData["pregnancy.firstPregnancy"] = pregnancy.firstPregnancy || "yes";
-      
-      console.log("📊 Saving pregnancy data:");
-      console.log("   babyCount:", updateData["pregnancy.babyCount"]);
-      console.log("   babyNames:", updateData["pregnancy.babyNames"]);
-      console.log("   dueDate:", updateData["pregnancy.dueDate"]);
-    }
-    
-    const user = await User.findOneAndUpdate(
-      { email },
-      { $set: updateData },
-      { new: true }
-    );
-    
+    // First, update basic user info
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
+    
+    // Update basic fields
+    if (fullName !== undefined) user.fullName = fullName;
+    if (phone !== undefined) user.phone = phone;
+    if (profileImage !== undefined) user.profileImage = profileImage;
+    
+    // Handle pregnancy data with multiple babies support
+    if (pregnancy) {
+      // Initialize pregnancy object if it doesn't exist
+      if (!user.pregnancy) {
+        user.pregnancy = {};
+      }
+      
+      // Filter out empty baby names
+      const filteredBabyNames = (pregnancy.babyNames || []).filter(name => name && name.trim());
+      
+      // Update pregnancy fields
+      if (pregnancy.dueDate !== undefined) user.pregnancy.dueDate = pregnancy.dueDate;
+      if (pregnancy.firstPregnancy !== undefined) user.pregnancy.firstPregnancy = pregnancy.firstPregnancy;
+      user.pregnancy.babyCount = pregnancy.babyCount || 1;
+      user.pregnancy.babyNames = filteredBabyNames.length > 0 ? filteredBabyNames : [""];
+      user.pregnancy.babyName = filteredBabyNames[0] || pregnancy.babyName || "";
+      
+      console.log("📊 Saving pregnancy data:");
+      console.log("   babyCount:", user.pregnancy.babyCount);
+      console.log("   babyNames:", user.pregnancy.babyNames);
+      console.log("   dueDate:", user.pregnancy.dueDate);
+    }
+    
+    // Save the user
+    await user.save();
     
     console.log(`✅ Profile updated for ${email}`);
     console.log(`   Updated babyCount: ${user.pregnancy?.babyCount}`);
     console.log(`   Updated babyNames: ${user.pregnancy?.babyNames}`);
     
+    // Return the updated user
     res.json({ 
       success: true, 
       message: "Profile updated successfully",
