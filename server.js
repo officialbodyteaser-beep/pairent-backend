@@ -437,6 +437,39 @@ app.get("/api/partner/connection/:email", async (req, res) => {
   }
 });
 
+// ========== GET USER BY ID - For fetching partner profile ==========
+app.get("/api/user/id/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+    
+    const user = await User.findById(userId).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        profileImage: user.profileImage || null,
+        role: user.role
+      }
+    });
+    
+  } catch (error) {
+    console.error("❌ Error fetching user by ID:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ========== PARTNER ROUTES ==========
 app.get("/api/partner/:email", async (req, res) => {
   try {
@@ -880,6 +913,21 @@ const timelineDatabase = {
   }
 };
 
+// Add more timeline data for weeks 2-39 as needed
+for (let i = 2; i <= 39; i++) {
+  timelineDatabase[i] = {
+    week: i,
+    title: `Week ${i}`,
+    description: `Week ${i} of your pregnancy. Your baby is continuing to grow and develop.`,
+    babySize: getBabySizeByWeek(i),
+    symptoms: ["Back pain", "Fatigue", "Swelling", "Heartburn"],
+    tip: "Stay active and eat healthy foods.",
+    image: `/timeline/week${i}.png`,
+    imageAlt: `Week ${i} - Size of a ${getBabySizeByWeek(i)}`,
+    searchQuery: `${i} weeks pregnant`
+  };
+}
+
 app.get("/api/timeline/:week", (req, res) => {
   const week = parseInt(req.params.week);
   if (week >= 1 && week <= 40 && timelineDatabase[week]) {
@@ -1084,6 +1132,7 @@ app.get("/api/user/profile/:email", async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
 // ========== MONGODB CONNECTION ==========
 const PORT = process.env.PORT || 5000;
 
