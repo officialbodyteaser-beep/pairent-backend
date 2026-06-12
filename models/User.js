@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
   {
@@ -92,12 +93,9 @@ userSchema.methods.getBabyType = function() {
   return types[count] || "single";
 };
 
-// NO PASSWORD HASHING FOR NOW (for testing)
-// Password will be stored as plain text temporarily
-
-// Simple password comparison (no hashing)
-userSchema.methods.comparePassword = function(candidatePassword) {
-  return this.password === candidatePassword;
+// Password comparison method using bcrypt
+userSchema.methods.comparePassword = async function(candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
 };
 
 export default mongoose.model("User", userSchema);
